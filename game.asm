@@ -46,7 +46,7 @@ ADDRESS_JOY2_STATE           = $dc00
 
 ; Constants
 ; --------------------------------
-C_ROOF_YPOS = #136      ; Screen Height (25 x 8 = 200), 200 - (8 x 8) = 136
+C_ROOF_YPOS = #142      ; Screen Height (25 x 8 = 200), 200 - (8 x 8) = 136
 C_PLAYER1_STARTX = #72;  ; Screen Width (40 x 8 = 320, 30 x 8 = 240) 40 + 32
 
 ; Include external files
@@ -69,7 +69,8 @@ IncBin "sprites.spt", 1, 1, True  ; Load sprite 1 - 1 and pad to 64 bytes
 ; --------------------------------
 init
     ; Clear the screen
-    ; jsr ADDRESS_CLEAR_SCREEN
+    jsr ADDRESS_CLEAR_SCREEN
+    jsr draw_roof
 
     ; Set foreground color
     lda #COLOR_WHITE
@@ -87,7 +88,7 @@ init
     sta ADDRESS_SPRITE0_POINTER
     ; X/Y position
     ldx C_PLAYER1_STARTX ; X position
-    ldy C_ROOF_YPOS ; Y position
+    ldy #50 ; Y position
     stx ADDRESS_SPRITE0_XPOS
     sty ADDRESS_SPRITE0_YPOS
     lda #%00000001            ; Enable first sprite
@@ -166,11 +167,65 @@ clear
     inx
     bne clear
     rts
-    
-move_player1
-        ; Falling
-        inc ADDRESS_SPRITE0_YPOS
-        inc ADDRESS_SPRITE0_YPOS
+
+; --------------------------------
+; Draw rooftop
+; --------------------------------
+draw_roof
+        ; At row 18 fill 30 chars
+        ; 5 empty spaces on each sida
+        ldx #0
+        lda #79 ; Character
+@loop   sta $06ad,x ; Memory offset to fill
+        inx ; x++
+        cpx #30 ; x == 30 ?
+        bne @loop ; if no; loop
         rts
+
+; --------------------------------
+; Move player 1
+; --------------------------------
+move_player1
+        jsr apply_gravity_player1
+        rts
+
+; --------------------------------
+; Apply gravity to player 1
+; --------------------------------
+apply_gravity_player1
+        ; If jumping return
+        lda player1_is_jumping
+        cmp #1
+        beq @done 
+        ; Can player fall?
+        ; Outside roof to the left?
+        lda ADDRESS_SPRITE0_XPOS
+        cmp #40 ; 5x8
+        bcc @fall ; Skip to fall if outside roof (x < 40)
+        ; In sky?
+        lda ADDRESS_SPRITE0_YPOS
+        cmp #C_ROOF_YPOS
+        bcc @fall ; Skip to fall if in sky (a < roof)
+        ; Flag player on ground
+        lda #1
+        sta player1_on_ground
+        jmp @done
+@fall
+        ; Unset flag player on ground
+        lda #0
+        sta player1_on_ground
+        ; Increment Y
+        inc ADDRESS_SPRITE0_YPOS
+        inc ADDRESS_SPRITE0_YPOS
+@done   rts
+
+; Vars
+; --------------------------------
+
+player1_is_jumping
+        byte $00
+player1_on_ground
+        byte $00
+
 
 

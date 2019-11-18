@@ -95,6 +95,10 @@ init
     sta ADDRESS_SPRITE_ENABLE
     lda #%00000001            ; Double height
     sta ADDRESS_SPRITE_DOUBLE_HEIGHT
+    lda #COLOR_PINK
+    sta ADDRESS_SPRITE0_COLOR
+    lda #%11111111
+    sta ADDRESS_SPRITE_MULTICOLOR
     
 init_raster_interrupt
     ; Disable interrupts
@@ -148,6 +152,9 @@ raster_interrupt
 mainloop
     ; inc ADDRESS_BACKGROUND_COLOR
 
+
+        jsr read_joysticks
+
         jsr move_player1
 
     rts
@@ -183,11 +190,62 @@ draw_roof
         rts
 
 ; --------------------------------
+; Read joysticks and set variables
+; --------------------------------
+read_joysticks
+        ; Player 1
+        lda ADDRESS_JOY2_STATE
+        lsr
+        ror player1_joy_up
+        lsr
+        ror player1_joy_down
+        lsr
+        ror player1_joy_left
+        lsr
+        ror player1_joy_right
+        lsr
+        ror player1_joy_fire
+        rts
+
+; --------------------------------
 ; Move player 1
 ; --------------------------------
 move_player1
+        jsr check_jump_player1
         jsr apply_gravity_player1
         rts
+
+; --------------------------------
+; Check player 1 jumping
+; --------------------------------
+check_jump_player1
+        ; If jumping do the jump
+        lda player1_is_jumping
+        cmp #1
+        beq @jump
+        ; On ground?
+        lda player1_on_ground
+        cmp #1
+        bne @done
+        ; Up pressed?
+        bit player1_joy_fire
+        bmi @done
+        bvc @done
+        ; Begin jump
+        lda #1
+        sta player1_is_jumping
+        lda #20
+        sta player1_jump_count
+        ; Do the jumping
+@jump   dec ADDRESS_SPRITE0_YPOS
+        dec ADDRESS_SPRITE0_YPOS
+        inc ADDRESS_SPRITE0_XPOS
+        dec player1_jump_count
+        bne @done
+        ; Stop jumping
+        lda #0
+        sta player1_is_jumping
+@done   rts
 
 ; --------------------------------
 ; Apply gravity to player 1
@@ -224,8 +282,19 @@ apply_gravity_player1
 
 player1_is_jumping
         byte $00
+player1_jump_count
+        byte $00
 player1_on_ground
         byte $00
-
+player1_joy_fire
+        byte $00
+player1_joy_up
+        byte $00
+player1_joy_down
+        byte $00
+player1_joy_left
+        byte $00
+player1_joy_right
+        byte $00
 
 

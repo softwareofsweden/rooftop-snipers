@@ -25,24 +25,52 @@ COLOR_LIGHT_GREY    = $0f
 
 ; Memory Addresses
 ; --------------------------------
-ADDRESS_BORDER_COLOR         = $d020
-ADDRESS_BACKGROUND_COLOR     = $d021
-ADDRESS_CLEAR_SCREEN         = $e544
-ADDRESS_SCREEN_RAM           = $0400
-ADDRESS_COLOR_RAM            = $d800
-ADDRESS_SPRITES              = $2000
-ADDRESS_SPRITE_MULTICOLOR    = $d01c
-ADDRESS_SPRITE_ENABLE        = $d015
-ADDRESS_SPRITE_DOUBLE_WIDTH  = $D01D
-ADDRESS_SPRITE_DOUBLE_HEIGHT = $D017
-ADDRESS_SPRITE0_POINTER      = ADDRESS_SCREEN_RAM + $3f8
-ADDRESS_SPRITE0_COLOR        = $d027
-ADDRESS_SPRITE0_XPOS         = $d000
-ADDRESS_SPRITE0_YPOS         = $d001
-ADDRESS_SID                  = $1000
-ADDRESS_SID_PLAY             = $1003
-ADDRESS_CHARS                = $3800
-ADDRESS_JOY2_STATE           = $dc00
+ADDRESS_BORDER_COLOR          = $d020
+ADDRESS_BACKGROUND_COLOR      = $d021
+ADDRESS_CLEAR_SCREEN          = $e544
+ADDRESS_SCREEN_RAM            = $0400
+ADDRESS_COLOR_RAM             = $d800
+ADDRESS_SPRITES               = $2000
+ADDRESS_SPRITE_MULTICOLOR     = $d01c
+ADDRESS_SPRITE_ENABLE         = $d015
+ADDRESS_SPRITE_DOUBLE_WIDTH   = $D01D
+ADDRESS_SPRITE_DOUBLE_HEIGHT  = $D017
+ADDRESS_SPRITE0_POINTER       = ADDRESS_SCREEN_RAM + $3f8
+ADDRESS_SPRITE0_COLOR         = $d027
+ADDRESS_SPRITE0_XPOS          = $d000
+ADDRESS_SPRITE0_YPOS          = $d001
+ADDRESS_SID                   = $1000
+ADDRESS_SID_PLAY              = $1003
+ADDRESS_CHARS                 = $3800
+ADDRESS_JOY2_STATE            = $dc00
+ADDRESS_CIA1_ICR              = $dc0d
+ADDRESS_CIA2_ICR              = $dd0d
+
+ADDRESS_INTERRUPT_CONTROL_REG = $d01a
+; Bit #0: 1 = Raster interrupt enabled.
+; Bit #1: 1 = Sprite-background collision interrupt enabled.
+; Bit #2: 1 = Sprite-sprite collision interrupt enabled.
+; Bit #3: 1 = Light pen interrupt enabled.
+
+ADDRESS_SCREEN_CONTROL_REG = $d011
+; Bits #0-#2: Vertical raster scroll.
+; Bit #3: Screen height; 0 = 24 rows; 1 = 25 rows.
+; Bit #4: 0 = Screen off, complete screen is covered by border; 1 = Screen on, normal screen contents are visible.
+; Bit #5: 0 = Text mode; 1 = Bitmap mode.
+; Bit #6: 1 = Extended background mode on.
+; Bit #7: Read: Current raster line (bit #8).
+;         Write: Raster line to generate interrupt at (bit #8).
+; Default: $1B, %00011011.
+
+ADDRESS_SCREEN_CONTROL_REG2 = $d016
+; Bits #0-#2: Horizontal raster scroll.
+; Bit #3: Screen width; 0 = 38 columns; 1 = 40 columns.
+; Bit #4: 1 = Multicolor mode on.
+; Default: $C8, %11001000.
+
+ADDRESS_RASTER_LINE = $d012
+; Read: Current raster line (bits #0-#7).
+; Write: Raster line to generate interrupt at (bits #0-#7).
 
 ; Constants
 ; --------------------------------
@@ -68,96 +96,90 @@ IncBin "sprites.spt", 1, 1, True  ; Load sprite 1 - 1 and pad to 64 bytes
 ; Entry point is here
 ; --------------------------------
 init
-    ; Clear the screen
-    jsr ADDRESS_CLEAR_SCREEN
-    jsr draw_roof
+        ; Clear the screen
+        jsr ADDRESS_CLEAR_SCREEN
+        jsr draw_roof
 
-    ; Set foreground color
-    lda #COLOR_WHITE
-    jsr set_foreground_color
+        ; Set foreground color
+        lda #COLOR_WHITE
+        jsr set_foreground_color
 
-    ; Background and border colors
-    lda #COLOR_BLACK
-    sta ADDRESS_BACKGROUND_COLOR
-    lda #COLOR_BLUE
-    sta ADDRESS_BORDER_COLOR
+        ; Background and border colors
+        lda #COLOR_BLACK
+        sta ADDRESS_BACKGROUND_COLOR
+        lda #COLOR_BLUE
+        sta ADDRESS_BORDER_COLOR
 
-    ; Player 1 Sprite
-    ; Sprite pointer
-    lda #$80 ; ADDRESS_SPRITES / 64 ($2000 / $40 = $80)
-    sta ADDRESS_SPRITE0_POINTER
-    ; X/Y position
-    ldx C_PLAYER1_STARTX ; X position
-    ldy #50 ; Y position
-    stx ADDRESS_SPRITE0_XPOS
-    sty ADDRESS_SPRITE0_YPOS
-    lda #%00000001            ; Enable first sprite
-    sta ADDRESS_SPRITE_ENABLE
-    lda #%00000001            ; Double height
-    sta ADDRESS_SPRITE_DOUBLE_HEIGHT
-    lda #COLOR_PINK
-    sta ADDRESS_SPRITE0_COLOR
-    lda #%11111111
-    sta ADDRESS_SPRITE_MULTICOLOR
+        ; Player 1 Sprite
+        ; Sprite pointer
+        lda #$80 ; ADDRESS_SPRITES / 64 ($2000 / $40 = $80)
+        sta ADDRESS_SPRITE0_POINTER
+        ; X/Y position
+        ldx C_PLAYER1_STARTX ; X position
+        ldy #50 ; Y position
+        stx ADDRESS_SPRITE0_XPOS
+        sty ADDRESS_SPRITE0_YPOS
+        lda #%00000001            ; Enable first sprite
+        sta ADDRESS_SPRITE_ENABLE
+        lda #%00000001            ; Double height
+        sta ADDRESS_SPRITE_DOUBLE_HEIGHT
+        lda #COLOR_PINK
+        sta ADDRESS_SPRITE0_COLOR
+        lda #%11111111
+        sta ADDRESS_SPRITE_MULTICOLOR
     
 init_raster_interrupt
-    ; Disable interrupts
-    sei                     ; Disable interupt signal
-    lda #$7f
-    sta $dc0d
-    sta $dd0d
-    lda #$01
-    sta $d01a
-    ; Set text mode
-    lda #$1b
-    ldx #$08
-    ldy #$14
-    sta $d011
-    stx $d016
-    sty $d014
-    ; Init irq
-    lda #<raster_interrupt
-    ldx #>raster_interrupt
-    sta $0314
-    stx $0315
-    ; Create rater interrupt at...
-    ldy #$00        ; Line Zero
-    sty $d012
-    ; Clear interrupts and ack irq
-    lda $dc0d
-    lda $dd0d
-    asl $d019
-    cli
-    jmp *       ; infinite loop
+        ; Disable interrupts
+        sei ; Disable interupt signal
+        lda #$7f
+        sta ADDRESS_CIA1_ICR
+        sta ADDRESS_CIA2_ICR
+        lda #$01
+        sta ADDRESS_INTERRUPT_CONTROL_REG
+        ; Set text mode
+        lda #$1b
+        ldx #$08
+        ldy #$14
+        sta ADDRESS_SCREEN_CONTROL_REG
+        stx ADDRESS_SCREEN_CONTROL_REG2
+        sty $d014
+        ; Init irq
+        lda #<raster_interrupt
+        ldx #>raster_interrupt
+        sta $0314 ; Execution address of interrupt service routine.
+        stx $0315
+        ; Create rater interrupt at...
+        ldy #$00        ; Line Zero
+        sty ADDRESS_RASTER_LINE
+        ; Clear interrupts and ack irq
+        lda $dc0d
+        lda $dd0d
+        asl $d019
+        cli
+        jmp *       ; infinite loop
 
 raster_interrupt
-    ; Trigger next interupt
-    lda #<raster_interrupt
-    ldx #>raster_interrupt
-    sta $0314
-    stx $0315
-    ; Create raster interrupt at...
-    ldy #$00  ; Line Zero
-    
-    sty $d012
-    asl $d019
-    ; Call the mainloop
-    jsr mainloop
-    jmp $ea81
+        ; Trigger next interupt
+        lda #<raster_interrupt
+        ldx #>raster_interrupt
+        sta $0314 ; Execution address of interrupt service routine.
+        stx $0315
+        ; Create raster interrupt at...
+        ldy #$00  ; Line Zero
+        sty ADDRESS_RASTER_LINE
+        asl $d019
+        ; Call the mainloop
+        jsr mainloop
+        jmp $ea81
 
 ; --------------------------------
 ; The main loop. Called once per
 ; frame.
 ; --------------------------------
 mainloop
-    ; inc ADDRESS_BACKGROUND_COLOR
-
-
         jsr read_joysticks
-
         jsr move_player1
-
-    rts
+        rts
 
 ; --------------------------------
 ; Function that sets the
@@ -165,15 +187,15 @@ mainloop
 ; to specify color.
 ; --------------------------------
 set_foreground_color
-    ldx #$00
+        ldx #$00
 clear
-    sta $d800,x  
-    sta $d900,x
-    sta $da00,x
-    sta $dae8,x
-    inx
-    bne clear
-    rts
+        sta $d800,x  
+        sta $d900,x
+        sta $da00,x
+        sta $dae8,x
+        inx
+        bne clear
+        rts
 
 ; --------------------------------
 ; Draw rooftop

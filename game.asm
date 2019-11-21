@@ -131,15 +131,15 @@ init
 init_raster_interrupt
         ; Disable interrupts
         sei ; Disable interupt signal
-        lda #$7f
+        lda #$7f ; 0111111
         sta ADDRESS_CIA1_ICR
         sta ADDRESS_CIA2_ICR
         lda #$01
         sta ADDRESS_INTERRUPT_CONTROL_REG
         ; Set text mode
-        lda #$1b
-        ldx #$08
-        ldy #$14
+        lda #$1b ; 00011011
+        ldx #$08 ; 00001000
+        ldy #$14 ; 00010100
         sta ADDRESS_SCREEN_CONTROL_REG
         stx ADDRESS_SCREEN_CONTROL_REG2
         sty $d014

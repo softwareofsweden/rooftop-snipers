@@ -1,36 +1,71 @@
 ; --------------------------------
 ; C64 Rooftop Snipers
-; Code by: Martin
+; Code by: Sandis
+; Music by: Wolk
 ; (C) 2019- Software of Sweden
+; --------------------------------
+
+; --------------------------------
+; Memory
+; --------------------------------
+; $1000-$2978 Music
+; $5000-$6000 Charset
+; $6000       Sprites
+; $c000       Code
+
+; --------------------------------
+; *** CONSTANTS ***
 ; --------------------------------
 
 ; Colors
 ; --------------------------------
-COLOR_BLACK         = $00
-COLOR_WHITE         = $01
-COLOR_RED           = $02
-COLOR_CYAN          = $03
-COLOR_PURPLE        = $04
-COLOR_GREEN         = $05
-COLOR_BLUE          = $06
-COLOR_YELLOW        = $07
-COLOR_ORANGE        = $08
-COLOR_BROWN         = $09
-COLOR_PINK          = $0a
-COLOR_DARK_GREY     = $0b
-COLOR_GREY          = $0c
-COLOR_LIGHT_GREEN   = $0d
-COLOR_LIGHT_BLUE    = $0e
-COLOR_LIGHT_GREY    = $0f
+COLOR_BLACK         = #$00
+COLOR_WHITE         = #$01
+COLOR_RED           = #$02
+COLOR_CYAN          = #$03
+COLOR_PURPLE        = #$04
+COLOR_GREEN         = #$05
+COLOR_BLUE          = #$06
+COLOR_YELLOW        = #$07
+COLOR_ORANGE        = #$08
+COLOR_BROWN         = #$09
+COLOR_PINK          = #$0a
+COLOR_DARK_GREY     = #$0b
+COLOR_GREY          = #$0c
+COLOR_LIGHT_GREEN   = #$0d
+COLOR_LIGHT_BLUE    = #$0e
+COLOR_LIGHT_GREY    = #$0f
+
+; VIC Banks
+; --------------------------------
+VIC_BANK_0 = #%00000011 ; $0000-$3fff
+VIC_BANK_1 = #%00000010 ; $4000-$7fff
+VIC_BANK_2 = #%00000001 ; $8000-$bfff
+VIC_BANK_3 = #%00000000 ; $c000-$ffff
+
+; Keyboard matrix codes
+; --------------------------------
+KBD_MATRIX_CODE_1 = #$38
+KBD_MATRIX_CODE_2 = #$3b
+KBD_MATRIX_CODE_3 = #$08
+KBD_MATRIX_CODE_4 = #$0b
+
+; SID tunes
+; --------------------------------
+SONG_WK_RTOP_TITLE2 = #0;
+SONG_WK_RTOP_TITLE3 = #1;
+SONG_WK_INGAME = #2;
+SONG_WK_UNITY = #3;
 
 ; Memory Addresses
 ; --------------------------------
 ADDRESS_BORDER_COLOR          = $d020
 ADDRESS_BACKGROUND_COLOR      = $d021
 ADDRESS_CLEAR_SCREEN          = $e544
-ADDRESS_SCREEN_RAM            = $0400
+;ADDRESS_SCREEN_RAM            = $0400 ; Bank 0
+ADDRESS_SCREEN_RAM            = $4400 ; Bank 1
 ADDRESS_COLOR_RAM             = $d800
-ADDRESS_SPRITES               = $2400
+ADDRESS_SPRITES               = $6000
 ADDRESS_SPRITE_MULTICOLOR     = $d01c
 ADDRESS_SPRITE_ENABLE         = $d015
 ADDRESS_SPRITE_DOUBLE_WIDTH   = $D01D
@@ -54,6 +89,12 @@ ADDRESS_CHARS                 = $3800
 ADDRESS_JOY2_STATE            = $dc00
 ADDRESS_CIA1_ICR              = $dc0d
 ADDRESS_CIA2_ICR              = $dd0d
+ADDRESS_VIC_BANK              = $dd00
+; SCNKEY. Query keyboard; put current matrix code into memory 
+; address $00CB, current status of shift keys into memory 
+; address $028D and PETSCII code into keyboard buffer.
+ADDRESS_KERNAL_SCNKEY         = $ff9f
+ADDRESS_KEYPRESSED_MATRIXCODE = $00cb;
 
 ADDRESS_INTERRUPT_CONTROL_REG = $d01a
 ; Bit #0: 1 = Raster interrupt enabled.
@@ -61,7 +102,7 @@ ADDRESS_INTERRUPT_CONTROL_REG = $d01a
 ; Bit #2: 1 = Sprite-sprite collision interrupt enabled.
 ; Bit #3: 1 = Light pen interrupt enabled.
 
-ADDRESS_SCREEN_CONTROL_REG = $d011
+ADDRESS_SCREEN_CONTROL_REG    = $d011
 ; Bits #0-#2: Vertical raster scroll.
 ; Bit #3: Screen height; 0 = 24 rows; 1 = 25 rows.
 ; Bit #4: 0 = Screen off, complete screen is covered by border; 1 = Screen on, normal screen contents are visible.
@@ -71,20 +112,20 @@ ADDRESS_SCREEN_CONTROL_REG = $d011
 ;         Write: Raster line to generate interrupt at (bit #8).
 ; Default: $1B, %00011011.
 
-ADDRESS_SCREEN_CONTROL_REG2 = $d016
+ADDRESS_SCREEN_CONTROL_REG2   = $d016
 ; Bits #0-#2: Horizontal raster scroll.
 ; Bit #3: Screen width; 0 = 38 columns; 1 = 40 columns.
 ; Bit #4: 1 = Multicolor mode on.
 ; Default: $C8, %11001000.
 
-ADDRESS_RASTER_LINE = $d012
+ADDRESS_RASTER_LINE           = $d012
 ; Read: Current raster line (bits #0-#7).
 ; Write: Raster line to generate interrupt at (bits #0-#7).
 
-ADDRESS_SID                  = $1000
-ADDRESS_SID_PLAY             = $1003
+ADDRESS_SID                   = $1000
+ADDRESS_SID_PLAY              = $1003
 
-; Constants
+; Game specific
 ; --------------------------------
 C_ROOF_YPOS = #142      ; Screen Height (25 x 8 = 200), 200 - (8 x 8) = 136
 C_PLAYER1_STARTX = #72;  ; Screen Width (40 x 8 = 320, 30 x 8 = 240) 40 + 32
@@ -99,12 +140,15 @@ C_PLAYER1_STARTX = #72;  ; Screen Width (40 x 8 = 320, 30 x 8 = 240) 40 + 32
         byte $0d,$08,$dc,$07,$9e,$20,$34,$39
         byte $31,$35,$32,$00,$00,$00
 
-* = $1000
-IncBin "music/wk_unity.sid",$7e ; Remove header from sid and cut off original loading address
+* = $1000 ; $1000-$2978
+IncBin "music/Rooftop.sid",$7e ; Remove header from sid and cut off original loading address
+
+* = $5000 ; $5000-$6000
+IncBin "charset.bin"
 
 ; Sprites
-* = $2000
-IncBin "sprites.spt", 1, 7, True  ; Load sprite 1 - 2 and pad to 64 bytes
+* = $6000
+IncBin "sprites.spt", 1, 7, True  ; Load sprite 1 - 7 and pad to 64 bytes
 ; 1 = Player
 ; 2 = Player Jump
 ; 3 = Bullet
@@ -115,18 +159,33 @@ IncBin "sprites.spt", 1, 7, True  ; Load sprite 1 - 2 and pad to 64 bytes
 ; Entry point is here
 ; --------------------------------
 init
+        ; Set VIC Bank
+        lda ADDRESS_VIC_BANK
+        and #%11111100
+        ora VIC_BANK_1
+        sta ADDRESS_VIC_BANK
+
+        ; Charset location
+        ;lda $d018  ; set chars location to $3800 for displaying the custom font
+        ;ora #$0e   ; Bits 1-3 ($400+512bytes * low nibble value) of $d018 sets char location
+        ;sta $d018  ; $400 + $200 * $0E = $3800
+
         ; Clear the screen
-        jsr ADDRESS_CLEAR_SCREEN
+        jsr clear_screen
         jsr draw_roof
 
         ; Set foreground color
-        lda #COLOR_WHITE
+        lda COLOR_WHITE
         jsr set_foreground_color
 
+        lda #$20
+        sta ADDRESS_SCREEN_RAM
+        sta ADDRESS_SCREEN_RAM+1
+
         ; Background and border colors
-        lda #COLOR_BLUE
+        lda COLOR_BLUE
         sta ADDRESS_BACKGROUND_COLOR
-        lda #COLOR_BLACK        
+        lda COLOR_BLACK        
         sta ADDRESS_BORDER_COLOR
 
         ; Player 1 Sprite
@@ -168,13 +227,10 @@ init
         ldy #50 ; Y position
         stx ADDRESS_SPRITE2_XPOS
         sty ADDRESS_SPRITE2_YPOS
-    
-init_music
-        lda #0
-        tax
-        tay
-        jsr ADDRESS_SID
 
+        lda SONG_WK_UNITY ; Sid Subtune
+        jsr init_music
+    
 init_raster_interrupt
         ; Disable interrupts
         sei ; Disable interupt signal
@@ -229,7 +285,62 @@ mainloop
         jsr move_player1
         jsr move_bullet1
         jsr update_blood1
+        jsr change_music
         rts
+
+; --------------------------------
+; Use keys 1-4 to change song
+; (For debugging)
+; --------------------------------
+change_music
+        jsr ADDRESS_KERNAL_SCNKEY
+        lda ADDRESS_KEYPRESSED_MATRIXCODE
+        cmp KBD_MATRIX_CODE_1
+        bne @skip1
+        ; Pressed key 1
+        inc ADDRESS_SCREEN_RAM
+        pha
+        lda SONG_WK_UNITY
+        jsr init_music
+        pla
+@skip1
+        cmp KBD_MATRIX_CODE_2
+        bne @skip2
+        ; Pressed key 2
+        inc ADDRESS_SCREEN_RAM + 1
+        pha
+        lda SONG_WK_RTOP_TITLE2
+        jsr init_music
+        pla
+@skip2
+        cmp KBD_MATRIX_CODE_3
+        bne @skip3
+        ; Pressed key 3
+        inc ADDRESS_SCREEN_RAM + 2
+        pha
+        lda SONG_WK_RTOP_TITLE3
+        jsr init_music
+        pla
+@skip3
+        cmp KBD_MATRIX_CODE_4
+        bne @skip4
+        ; Pressed key 4
+        inc ADDRESS_SCREEN_RAM + 3
+        pha
+        lda SONG_WK_INGAME
+        jsr init_music
+        pla
+@skip4
+        rts
+
+; --------------------------------
+; Play music
+; A = Subtune
+; --------------------------------
+init_music
+        ldx #0
+        ldy #0
+        jsr ADDRESS_SID
 
 ; --------------------------------
 ; Function that sets the
@@ -248,14 +359,28 @@ clear
         rts
 
 ; --------------------------------
+; Clear screen
+; --------------------------------
+clear_screen
+        ldx #0
+        lda #$20
+@loop   sta ADDRESS_SCREEN_RAM,x
+        sta ADDRESS_SCREEN_RAM + $100,x   
+        sta ADDRESS_SCREEN_RAM + $200,x   
+        sta ADDRESS_SCREEN_RAM + $300,x
+        dex          ; Decrement value in x reg
+        bne @loop    ; If not zero, branch to loop
+        rts
+
+; --------------------------------
 ; Draw rooftop
 ; --------------------------------
 draw_roof
         ; At row 18 fill 30 chars
         ; 5 empty spaces on each side
         ldx #0
-        lda #79 ; Character
-@loop   sta $06ad,x ; Memory offset to fill
+        lda #40 ; Character
+@loop   sta ADDRESS_SCREEN_RAM + $02ad,x ; Memory offset to fill
         inx ; x++
         cpx #30 ; x == 30 ?
         bne @loop ; if no; loop

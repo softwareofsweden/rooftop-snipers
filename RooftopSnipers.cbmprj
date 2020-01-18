@@ -42,6 +42,17 @@
     <PaddingByte>234</PaddingByte>
     <SourceFiles>
         <SourceFile>
+            <Name>default.cst</Name>
+            <PrgName />
+            <FileType>6</FileType>
+            <IncludeInBuild>True</IncludeInBuild>
+            <Regions />
+            <Breakpoints />
+            <Bookmarks />
+            <Topmost>False</Topmost>
+            <FileOpen>False</FileOpen>
+        </SourceFile>
+        <SourceFile>
             <Name>game.asm</Name>
             <PrgName />
             <FileType>2</FileType>
@@ -67,6 +78,17 @@
             <Name>sprites.spt</Name>
             <PrgName />
             <FileType>7</FileType>
+            <IncludeInBuild>True</IncludeInBuild>
+            <Regions />
+            <Breakpoints />
+            <Bookmarks />
+            <Topmost>False</Topmost>
+            <FileOpen>False</FileOpen>
+        </SourceFile>
+        <SourceFile>
+            <Name>test.sdd</Name>
+            <PrgName />
+            <FileType>9</FileType>
             <IncludeInBuild>True</IncludeInBuild>
             <Regions />
             <Breakpoints />
